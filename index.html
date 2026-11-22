@@ -268,10 +268,14 @@ details.sel summary::-webkit-details-marker{display:none}
 .gloss dd{margin:0;color:var(--mut)}
 
 /* power play */
+.ox-o{fill:none;stroke:var(--or);stroke-width:.17}
+.ox-x{fill:none;stroke:var(--blue);stroke-width:.17;stroke-linecap:round}
 .tbl.pp th,.tbl.pp td{white-space:nowrap}
 .tbl.pp td:first-child{min-width:120px}
 .ppin{display:inline-flex;align-items:center;gap:6px}
 .ppin input.qi{width:54px;min-height:44px;text-align:center;border:1px solid var(--line);border-radius:9px;background:var(--bg);font-size:17px;font-weight:700}
+.ppe td .ppp{display:block;font-size:13px;color:var(--mut);font-weight:600;margin-top:4px}
+.ppe .ppin input.qi{width:48px}
 .ppin input.qi.bad{background:var(--bad);border-color:var(--loss)}
 /* column groups */
 .tbl th button.tog{text-decoration:underline dotted;text-underline-offset:3px}
@@ -378,7 +382,7 @@ const JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js
 
 /* ================= state ================= */
 const S={team:null,matches:{},mode:'loading',view:null,ed:null,readonly:false,
- ui:{tog:new Set(),season:null,comp:'all',excl:new Set(),sort:{},stTab:'pole',heat:{pl:'all',mt:'all',mode:'zones'},qmode:null,etab:null}};
+ ui:{oxm:{h:'g',s:'g'},tog:new Set(),season:null,comp:'all',excl:new Set(),sort:{},stTab:'pole',heat:{pl:'all',mt:'all',mode:'zones'},qmode:null,etab:null}};
 let REAL={team:null,matches:{}};
 const emptyTeam=()=>({name:'',players:[],seasons:[]});
 const normTeam=t=>{t=clone(t||{});t.players=Array.isArray(t.players)?t.players:[];t.seasons=Array.isArray(t.seasons)?t.seasons:[];t.name=t.name||'';return t};
@@ -502,6 +506,7 @@ function court(o={}){const id='c'+(++CID);
  if(o.zones!==false)h+=`<path class="c-zone" d="${zoneLines()}"/>`;
  h+=`<rect class="c-out" x="0" y="0" width="20" height="20"/><rect class="c-goal" x="8.5" y="-1" width="3" height="1"/>`;
  const sh=o.shots||[];const rs=sh.length>120?.6:sh.length>50?.78:1;h+=`<g style="opacity:${sh.length>120?.8:1}">`;sh.forEach(s=>h+=shotMark(s,rs));h+='</g>';
+ if(o.marks){const k=o.marks.length>120?.6:o.marks.length>50?.78:1;o.marks.forEach(x=>h+=markOX(x,k))}
  if(o.labels)h+=o.labels;
  if(o.pending&&o.pending.x!=null)h+=`<circle class="c-pend" cx="${o.pending.x}" cy="${o.pending.y}" r=".7"/>`;
  return h+'</svg>'}
@@ -554,13 +559,14 @@ function sortTable(id,cols,rows,o={}){const st=S.ui.sort[id]||o.def||{k:cols[0].
 const BLANK=new Set(['num','pos','date','home','comp','res','top']);
 function totRow(rows,n){const t=zero();rows.forEach(r=>KEYS.forEach(k=>t[k]+=+r[k]||0));t.z=n;derive(t);t.p={name:'Celkem',number:'',pos:''};t.m={opp:'Celkem'};t.isTot=1;return t}
 function totM(rows){const sc=rows.filter(r=>hasScore(r.m));return{m:{opp:'Celkem',su:sc.length?sc.reduce((a,r)=>a+ +r.m.su,0):null,so:sc.length?sc.reduce((a,r)=>a+ +r.m.so,0):null},t:totRow(rows.map(r=>r.t),rows.length),isTot:1}}
-function totPP(rows){return{m:{opp:'Celkem'},tm:ppSum(rows.map(r=>r.m)),isTot:1}}
+function totPP(rows){return{m:{opp:'Celkem',ts:tsMerge(rows.map(r=>r.m))},tm:ppSum(rows.map(r=>r.m)),isTot:1}}
 const csvVal=(c,r)=>c.csv?c.csv(r):(c.v?c.v(r):r[c.k]);
 function csv(rows){return '﻿'+rows.map(r=>r.map(c=>{let s=c==null?'':typeof c==='number'?String(Math.round(c*10)/10).replace('.',','):String(c);return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(';')).join('\r\n')}
 function catCols(src){return [['c7','7m','pg','pa','7m hody'],['c6','6m','z6','s6','Z 6 m'],['c9','9m','z9','s9','Z 9 m'],['ck','Kř','zk','sk','Z křídla'],['cr','RÚ','ru','sr','Rychlý útok']].map(([k,l,g,h,t])=>({k,l,t:t+': góly/střely – klepnutím na název zobrazíte úspěšnost',n:1,tog:1,
  v:r=>pct(src(r)[g],src(r)[h]),f:(r,on)=>{const x=src(r),G=x[g]||0,H=x[h]||0;return G||H?`${G}/${H}${on?` <b class="tp">${H?fP0(pct(G,H)):'–'}</b>`:''}`:'–'},csv:r=>{const x=src(r);return `${x[g]||0}/${x[h]||0}`}}))}
 /* --- týmové statistiky: přesilová hra a oslabení --- */
-const TT=[
+const TT=[ {id:'ru',name:'Rychlý útok',unit:'střely',cnt:1,cols:[['1','1. vlna'],['2','2. vlna'],['v','Rychlý výhoz'],['b','Prázdná brána']],rows:[['rh','HBC','náš rychlý útok',1],['rs','Soupeř','rychlý útok soupeře',1]],
+  note:'Rychlý útok – zapisuje se „góly / střely“ v každé oblasti: 1. vlna, 2. vlna, rychlý výhoz (po obdrženém gólu) a střela do prázdné brány. HBC = náš rychlý útok, Soupeř = rychlý útok soupeře; úspěšnost = góly ÷ střely. Celkem = součet všech oblastí.'},
  {id:'pp',name:'Přesilová hra',cols:[['6','6 vs 5'],['7','7 vs 6']],rows:[['u','Útok','útočíme v přesilovce',1],['o','Obrana','bráníme během naší přesilovky',0]],
   note:'Přesilová hra – zapisuje se „góly / počet útoků“. Útok = naše útoky v přesilovce (6 vs 5, resp. se 7 hráči v poli 7 vs 6), úspěšnost = proměněné útoky. Obrana = naše obrana během naší přesilovky (soupeř útočí v oslabení), úspěšnost = ubráněné útoky (bez gólu soupeře).'},
  {id:'sh',name:'Oslabení',cols:[['5','5 vs 6'],['6','6 vs 7']],rows:[['su','Útok','útočíme v oslabení',1],['so','Obrana','bráníme v oslabení',0]],
@@ -571,19 +577,37 @@ const hasPP=tm=>TT.some(T=>hasT(tm,T));
 function ppSum(ms){const t={};TT.forEach(T=>tKeys(T).forEach(k=>{t[k]=0;ms.forEach(m=>t[k]+=+((m.tm||{})[k])||0)}));return t}
 function tRate(tm,T,r){const att=T.rows.find(x=>x[0]===r)[3];let g=0,n=0;T.cols.forEach(([c])=>{g+=+tm[r+c+'g']||0;n+=+tm[r+c+'n']||0});return{g,n,p:n&&g<=n?(att?g:n-g)/n*100:null}}
 function cRate(tm,T,r,c){const att=T.rows.find(x=>x[0]===r)[3];const g=+tm[r+c+'g']||0,n=+tm[r+c+'n']||0;return n&&g<=n?(att?g:n-g)/n*100:null}
+const unitOf=T=>T.unit||'útoky';
+const totCell=(tm,T,r)=>{const x=tRate(tm,T,r);return x.n||x.g?`${x.g}/${x.n}`:'–'};
 const ppCell=(tm,r,c)=>{const g=+tm[r+c+'g']||0,n=+tm[r+c+'n']||0;return n||g?`${g}/${n}`:'–'};
-function tView(tm,T,pdf){return `<table class="${pdf?'':'tbl pp'}"><thead><tr><th>${T.name}</th>${T.cols.map(([,l])=>`<th class="n">${l}</th><th class="n">${l} %</th>`).join('')}<th class="n">Úspěšnost celkem</th></tr></thead><tbody>${T.rows.map(([r,l])=>`<tr><td><b>${l}</b></td>${T.cols.map(([c])=>`<td class="n">${ppCell(tm,r,c)}</td><td class="n">${fP(cRate(tm,T,r,c))}</td>`).join('')}<td class="n"><b>${fP(tRate(tm,T,r).p)}</b></td></tr>`).join('')}</tbody></table>`}
+function tView(tm,T,pdf){return `<table class="${pdf?'':'tbl pp'}"><thead><tr><th>${T.name}</th>${T.cols.map(([,l])=>`<th class="n">${l}</th><th class="n">${l} %</th>`).join('')}${T.cnt?'<th class="n">Celkem</th>':''}<th class="n">Úspěšnost celkem</th></tr></thead><tbody>${T.rows.map(([r,l])=>`<tr><td><b>${l}</b></td>${T.cols.map(([c])=>`<td class="n">${ppCell(tm,r,c)}</td><td class="n">${fP(cRate(tm,T,r,c))}</td>`).join('')}${T.cnt?`<td class="n"><b>${totCell(tm,T,r)}</b></td>`:''}<td class="n"><b>${fP(tRate(tm,T,r).p)}</b></td></tr>`).join('')}</tbody></table>`}
 function tBlock(tm,T){return `<div class="card" style="margin-top:16px"><h3 style="margin-bottom:8px">${T.name}</h3><div class="scroll">${tView(tm,T)}</div><p class="note">${T.note}</p></div>`}
-function ppEntry(m){const tm=m.tm||{};return TT.map(T=>`<div class="card" style="margin-bottom:16px"><h3>${T.name}</h3><p class="note" style="margin-top:4px">${T.note}</p>
- <div class="scroll tblw" style="margin-top:10px"><table class="tbl pp ppe"><thead><tr><th></th>${T.cols.map(([,l])=>`<th class="n">${l}<br><small class="mut">góly / útoky</small></th><th class="n">${l} %</th>`).join('')}<th class="n">Úspěšnost celkem</th></tr></thead><tbody>
- ${T.rows.map(([r,l,sub])=>`<tr><td><b>${l}</b><br><small class="mut">${sub}</small></td>${T.cols.map(([c,cl])=>`<td class="n" data-l="${cl} · góly / útoky"><span class="ppin"><input class="qi" data-pp="${r}${c}g" inputmode="numeric" pattern="[0-9]*" value="${tm[r+c+'g']||''}" placeholder="0" aria-label="${T.name} ${l} ${cl} – góly"><span>/</span><input class="qi" data-pp="${r}${c}n" inputmode="numeric" pattern="[0-9]*" value="${tm[r+c+'n']||''}" placeholder="0" aria-label="${T.name} ${l} ${cl} – útoky"></span></td><td class="n" data-l="${cl} · úspěšnost"><span id="ppc-${r}${c}">${fP(cRate(tm,T,r,c))}</span></td>`).join('')}<td class="n" data-l="Úspěšnost celkem"><b id="ppr-${r}">${fP(tRate(tm,T,r).p)}</b></td></tr>`).join('')}
- </tbody></table></div></div>`).join('')}
-const tCols=T=>T.rows.flatMap(([r,l])=>[...T.cols.flatMap(([c,cl])=>[{k:r+c,l:`${l} ${cl}`,t:`${T.name} – ${l} ${cl} (góly/útoky)`,n:1,v:x=>+x.tm[r+c+'g']||0,f:x=>ppCell(x.tm,r,c),csv:x=>ppCell(x.tm,r,c)},
+function ppEntry(m){const tm=m.tm||{};return tsWrap(m,TT.map(T=>`<div class="card" style="margin-bottom:16px"><h3>${T.name}</h3><p class="note" style="margin-top:4px">${T.note}</p>
+ <div class="scroll tblw" style="margin-top:10px"><table class="tbl pp ppe"><thead><tr><th></th>${T.cols.map(([,l])=>`<th class="n">${l}<br><small class="mut">góly / ${unitOf(T)}</small></th>`).join('')}${T.cnt?`<th class="n">Celkem<br><small class="mut">góly / ${unitOf(T)}</small></th>`:''}<th class="n">Úspěšnost celkem</th></tr></thead><tbody>
+ ${T.rows.map(([r,l,sub])=>`<tr><td><b>${l}</b><br><small class="mut">${sub}</small></td>${T.cols.map(([c,cl])=>`<td class="n" data-l="${cl} · góly / ${unitOf(T)}"><span class="ppin"><input class="qi" data-pp="${r}${c}g" inputmode="numeric" pattern="[0-9]*" value="${tm[r+c+'g']||''}" placeholder="0" aria-label="${T.name} ${l} ${cl} – góly"><span>/</span><input class="qi" data-pp="${r}${c}n" inputmode="numeric" pattern="[0-9]*" value="${tm[r+c+'n']||''}" placeholder="0" aria-label="${T.name} ${l} ${cl} – ${unitOf(T)}"></span><small class="ppp" id="ppc-${r}${c}">${fP(cRate(tm,T,r,c))}</small></td>`).join('')}${T.cnt?`<td class="n" data-l="Celkem · góly / ${unitOf(T)}"><b id="ppt-${r}">${totCell(tm,T,r)}</b></td>`:''}<td class="n" data-l="Úspěšnost celkem"><b id="ppr-${r}">${fP(tRate(tm,T,r).p)}</b></td></tr>`).join('')}
+ </tbody></table></div></div>`).join(''))}
+const tsWrap=(m,html)=>html+tsEntry(m);
+const tCols=T=>T.rows.flatMap(([r,l])=>[...T.cols.flatMap(([c,cl])=>[{k:r+c,l:`${l} ${cl}`,t:`${T.name} – ${l} ${cl} (góly/${unitOf(T)})`,n:1,v:x=>+x.tm[r+c+'g']||0,f:x=>ppCell(x.tm,r,c),csv:x=>ppCell(x.tm,r,c)},
  {k:r+c+'p',l:`${cl} %`,t:`${T.name} – ${l} ${cl} úspěšnost %`,n:1,v:x=>cRate(x.tm,T,r,c),f:x=>fP(cRate(x.tm,T,r,c)),csv:x=>cRate(x.tm,T,r,c)}]),
+ ...(T.cnt?[{k:r+'t',l:`${l} celkem`,t:`${T.name} – ${l} celkem (góly/${unitOf(T)})`,n:1,v:x=>tRate(x.tm,T,r).g,f:x=>`<b>${totCell(x.tm,T,r)}</b>`,csv:x=>totCell(x.tm,T,r)}]:[]),
  {k:r+'p',l:`${l} celkem %`,t:`${T.name} – ${l} úspěšnost celkem %`,n:1,v:x=>tRate(x.tm,T,r).p,f:x=>`<b>${fP(tRate(x.tm,T,r).p)}</b>`,csv:x=>tRate(x.tm,T,r).p}]);
 const TBASE=[{k:'date',l:'Datum',v:r=>r.m.date,f:r=>fD(r.m.date)},{k:'opp',l:'Soupeř',stk:1,v:r=>r.m.opp||'',f:r=>`<b>${esc(r.m.opp||'?')}</b>`}];
-const PPCOLS=[...TBASE,...TT.flatMap(tCols)];
-const ppRows=ms=>ms.filter(m=>hasPP(m.tm)).map(m=>({m,tm:m.tm||{}}));
+const PPCOLS=[...TBASE,...TT.flatMap(tCols),{k:'tsh',l:'Pozice HBC',t:'Pozice střel HBC – góly/střely',n:1,v:x=>oxStats((x.m.ts||{}).h).g,f:x=>oxCell((x.m.ts||{}).h),csv:x=>oxCell((x.m.ts||{}).h)},{k:'tss',l:'Pozice soupeř',t:'Pozice střel soupeře – góly/střely',n:1,v:x=>oxStats((x.m.ts||{}).s).g,f:x=>oxCell((x.m.ts||{}).s),csv:x=>oxCell((x.m.ts||{}).s)}];
+const ppRows=ms=>ms.filter(m=>hasPP(m.tm)||hasTS(m)).map(m=>({m,tm:m.tm||{}}));
+/* --- pozice střel obou týmů (O = gól, X = bez gólu) --- */
+const OXN={h:'HBC',s:'Soupeř'};
+const TS_NOTE='Pozice střel – vyberte O (gól) nebo X (bez gólu) a klepněte do hřiště, odkud se střílelo. Klepnutím na existující značku ji smažete. Hřiště je vždy z pohledu útočícího týmu (branka nahoře).';
+const hasTS=m=>!!m&&!!m.ts&&((m.ts.h||[]).length+(m.ts.s||[]).length>0);
+function markOX(s,k=1){if(s.x==null)return'';if(s.r==='g')return `<circle class="ox-o" cx="${s.x.toFixed(2)}" cy="${s.y.toFixed(2)}" r="${(.42*k).toFixed(2)}"/>`;const d=.34*k;return `<path class="ox-x" d="M${s.x-d},${s.y-d}L${s.x+d},${s.y+d}M${s.x+d},${s.y-d}L${s.x-d},${s.y+d}"/>`}
+const oxStats=a=>{const n=(a||[]).length,g=(a||[]).filter(x=>x.r==='g').length;return{g,n,p:pct(g,n)}};
+const oxLine=a=>{const x=oxStats(a);return `O <b>${x.g}</b> · X <b>${x.n-x.g}</b> · úspěšnost <b>${fP(x.p)}</b>`};
+const oxCell=a=>{const x=oxStats(a);return x.n?`${x.g}/${x.n}`:'–'};
+const oxLegend='<div class="lg"><span><svg viewBox="-1 -1 2 2"><circle r=".7" fill="none" stroke="var(--or)" stroke-width=".3"/></svg>O = gól</span><span><svg viewBox="-1 -1 2 2"><path d="M-.6-.6L.6.6M.6-.6L-.6.6" stroke="var(--blue)" stroke-width=".3"/></svg>X = bez gólu</span></div>';
+function tsMerge(ms){const o={h:[],s:[]};ms.forEach(m=>{if(m.ts){o.h.push(...(m.ts.h||[]));o.s.push(...(m.ts.s||[]))}});return o}
+function zoneTbl(a,pdf){const Z=zoneStats(a),x=oxStats(a);return `<table class="${pdf?'':'tbl'}"><thead><tr><th>Zóna</th><th class="n">Góly / střely</th><th class="n">Úspěšnost</th></tr></thead><tbody>${Object.entries(ZN).filter(([k])=>k!=='7m').map(([k,l])=>`<tr><td><b>${k}</b> · ${l}</td><td class="n">${Z[k].s?Z[k].g+'/'+Z[k].s:'–'}</td><td class="n">${fP(pct(Z[k].g,Z[k].s))}</td></tr>`).join('')}</tbody><tfoot><tr><td>Celkem</td><td class="n">${x.g}/${x.n}</td><td class="n">${fP(x.p)}</td></tr></tfoot></table>`}
+function tsEntry(m){const ts=m.ts||{};return `<div class="card" style="margin-bottom:16px"><h3>Pozice střel</h3><p class="note" style="margin-top:4px">${TS_NOTE}</p><div class="grid g2" style="margin-top:12px">${['h','s'].map(side=>{const a=ts[side]||[];const md=S.ui.oxm[side]||'g';
+ return `<div><div class="chead"><h3>${OXN[side]}</h3><span class="small">${oxLine(a)}</span></div><div class="row" style="margin:8px 0"><div class="seg"><button data-act="oxm" data-v="${side}|g" class="${md==='g'?'on':''}">O · gól</button><button data-act="oxm" data-v="${side}|m" class="${md==='m'?'on':''}">X · bez gólu</button></div>${a.length?`<button class="btn sm" data-act="oxUndo" data-v="${side}">↶ Zpět</button>`:''}</div>${court({interactive:true,svgId:'ox-'+side,marks:a})}</div>`}).join('')}</div>${oxLegend}</div>`}
+function tsBlock(ts,title){return `<div class="card" style="margin-top:16px"><h3 style="margin-bottom:8px">${title||'Pozice střel'}</h3><div class="grid g2">${['h','s'].map(side=>{const a=ts[side]||[];return `<div><div class="chead"><h3>${OXN[side]}</h3><span class="small">${oxLine(a)}</span></div>${a.length?court({marks:a,heat:heatZones(a),labels:zoneLabels(a)})+`<div class="scroll" style="margin-top:8px">${zoneTbl(a)}</div>`:'<p class="mut">Bez zapsaných střel.</p>'}</div>`}).join('')}</div>${oxLegend}<p class="note">Sytější zóna = vyšší úspěšnost v rámci daného týmu.</p></div>`}
 const pname=r=>r.p?r.p.name:'';
 const FCOLS=[
  {k:'num',l:'#',n:1,v:r=>+r.p.number||null,f:r=>`<span class="jn">${esc(r.p.number)}</span>`},
@@ -843,7 +867,7 @@ function svgPt(svg,e){const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.client
 /* --- match report --- */
 function matchReport(m){const R=S.team.players.filter(p=>played(m.stats[p.id]));const lines=R.map(p=>statLine(m.stats[p.id],p));const fp=lines.filter(t=>t.p.pos!=='B'),gk=lines.filter(t=>t.p.pos==='B');const t=matchTeam(m);const shots=m.shots||[];
  const fc=FCOLS.filter(c=>!['pos','z','gpz'].includes(c.k)),gc=GCOLS.filter(c=>!['z','svz'].includes(c.k));
- const ppH=TT.filter(T=>hasT(m.tm,T)).map(T=>tBlock(m.tm,T)).join('');
+ const ppH=TT.filter(T=>hasT(m.tm,T)).map(T=>tBlock(m.tm,T)).join('')+(hasTS(m)?tsBlock(m.ts):'');
  if(!R.length)return ppH+`<div class="card empty"><h2>Zatím bez statistik</h2><p>Vyplňte čísla v rychlém zápisu – report se sestaví sám.</p><button class="btn pri" data-act="etab" data-v="quick">Otevřít rychlý zápis</button></div>`;
  return `<div class="kpis light" style="margin-bottom:14px">
   <div class="kpi"><div class="l">Výsledek</div><div class="v">${hasScore(m)?m.su+':'+m.so:'–'}</div><div class="s">${m.ht?'poločas '+esc(m.ht):(result(m)?{V:'výhra',R:'remíza',P:'prohra'}[result(m)]:'')}</div></div>
@@ -899,11 +923,11 @@ function vStats(){const all=inFilter(),ms=selected();const tab=S.ui.stTab;const 
  let body;
  if(tab==='pole')body=sortTable('sf',FCOLS,A.filter(t=>t.p.pos!=='B'),{def:{k:'goals',dir:-1},link:r=>'hrac-'+r.p.id,total:totRow(A.filter(t=>t.p.pos!=='B'),ms.length)})+`<p class="note">Kliknutím na záhlaví sloupce seřadíte.</p>`+glossary(FCOLS);
  else if(tab==='gk')body=sortTable('sg',GCOLS,A.filter(t=>t.p.pos==='B'),{def:{k:'svp',dir:-1},link:r=>'hrac-'+r.p.id,total:totRow(A.filter(t=>t.p.pos==='B'),ms.length)})+glossary(GCOLS);
- else if(tab==='pp'){const pm=ms.filter(m=>hasPP(m.tm));const sum=ppSum(pm);body=pm.length?TT.map(T=>{const tm2=ms.filter(m=>hasT(m.tm,T));return `<h2 style="margin:6px 0 10px">${T.name}</h2>`+(tm2.length?`<div class="card" style="margin-bottom:14px"><h3 style="margin-bottom:8px">Celkem za výběr (${tm2.length} ${plural(tm2.length,'zápas','zápasy','zápasů')})</h3><div class="scroll">${tView(sum,T)}</div><p class="note">${T.note}</p></div><h3 style="margin:4px 0 8px">Po zápasech</h3>`+sortTable('s'+T.id,[...TBASE,...tCols(T)],tm2.map(m=>({m,tm:m.tm})),{def:{k:'date',dir:-1},link:r=>'zapas-'+r.m.id,total:totPP(tm2.map(m=>({m,tm:m.tm})))}):`<div class="card empty" style="margin-bottom:14px"><p>Zatím bez dat.</p></div>`)}).join('<div style="height:18px"></div>'):'<div class="card empty"><h2>Zatím bez přesilovek a oslabení</h2><p>Otevřete zápas a v záložce „C · Týmové statistiky“ vyplňte tabulky Přesilová hra a Oslabení.</p></div>'}
+ else if(tab==='pp'){const pm=ms.filter(m=>hasPP(m.tm));const sum=ppSum(pm);const tsm=ms.filter(hasTS);body=pm.length||tsm.length?(pm.length?TT.map(T=>{const tm2=ms.filter(m=>hasT(m.tm,T));return `<h2 style="margin:6px 0 10px">${T.name}</h2>`+(tm2.length?`<div class="card" style="margin-bottom:14px"><h3 style="margin-bottom:8px">Celkem za výběr (${tm2.length} ${plural(tm2.length,'zápas','zápasy','zápasů')})</h3><div class="scroll">${tView(sum,T)}</div><p class="note">${T.note}</p></div><h3 style="margin:4px 0 8px">Po zápasech</h3>`+sortTable('s'+T.id,[...TBASE,...tCols(T)],tm2.map(m=>({m,tm:m.tm})),{def:{k:'date',dir:-1},link:r=>'zapas-'+r.m.id,total:totPP(tm2.map(m=>({m,tm:m.tm})))}):`<div class="card empty" style="margin-bottom:14px"><p>Zatím bez dat.</p></div>`)}).join('<div style="height:18px"></div>'):'')+(tsm.length?`<h2 style="margin:24px 0 0">Pozice střel</h2>`+tsBlock(tsMerge(tsm),`Celkem za výběr (${tsm.length} ${plural(tsm.length,'zápas','zápasy','zápasů')})`):''):'<div class="card empty"><h2>Zatím bez týmových statistik</h2><p>Otevřete zápas a v záložce „C · Týmové statistiky“ vyplňte tabulky Rychlý útok, Přesilová hra, Oslabení nebo Pozice střel.</p></div>'}
  else body=sortTable('sm',MCOLS,ms.map(m=>({m,t:matchTeam(m)})),{def:{k:'date',dir:-1},link:r=>'zapas-'+r.m.id,total:totM(ms.map(m=>({m,t:matchTeam(m)})))})+glossary(MCOLS);
  return `<div class="sect" style="margin-top:0"><div><h1>Statistiky</h1><div class="mut">Sezóna ${esc(season().name)}${S.ui.comp!=='all'?' · '+esc(S.ui.comp):''}</div></div>
  <div class="row"><button class="btn" data-act="csvStats">Excel (CSV)</button><button class="btn" data-act="pdfStats">PDF report</button></div></div>
- ${sel}<div class="row" style="margin-bottom:12px;justify-content:space-between"><div class="seg">${[['pole','Hráči v poli'],['gk','Brankáři'],['zap','Zápasy'],['pp','Přesilovky a oslabení']].map(([k,l])=>`<button data-act="stTab" data-v="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>${tab==='pp'?'':GLEG}</div>${ms.length?body:'<div class="card empty"><p>Ve výběru není žádný zápas.</p></div>'}`}
+ ${sel}<div class="row" style="margin-bottom:12px;justify-content:space-between"><div class="seg">${[['pole','Hráči v poli'],['gk','Brankáři'],['zap','Zápasy'],['pp','Týmové statistiky']].map(([k,l])=>`<button data-act="stTab" data-v="${k}" class="${tab===k?'on':''}">${l}</button>`).join('')}</div>${tab==='pp'?'':GLEG}</div>${ms.length?body:'<div class="card empty"><p>Ve výběru není žádný zápas.</p></div>'}`}
 const MCOLS=[{k:'date',l:'Datum',v:r=>r.m.date,f:r=>fD(r.m.date)},{k:'opp',l:'Soupeř',stk:1,v:r=>r.m.opp||'',f:r=>`<b>${esc(r.m.opp||'?')}</b>`},{k:'home',l:'D/V',v:r=>r.m.home?'D':'V'},{k:'comp',l:'Soutěž',v:r=>r.m.comp||''},
  {k:'sc',l:'Skóre',n:1,v:r=>hasScore(r.m)?(+r.m.su- +r.m.so):null,f:r=>hasScore(r.m)?`<b>${r.m.su}:${r.m.so}</b>`:'–',csv:r=>hasScore(r.m)?`${r.m.su}:${r.m.so}`:''},{k:'res',l:'Výsl.',v:r=>result(r.m)||'',f:r=>result(r.m)?`<span class="res ${result(r.m)}">${result(r.m)}</span>`:''},
  {k:'pct',l:'Střelba %',n:1,v:r=>r.t.pct,f:r=>fP(r.t.pct)},...catCols(r=>r.t),{k:'svp',l:'Brankáři %',n:1,v:r=>r.t.svp,f:r=>fP(r.t.svp)},
@@ -953,12 +977,12 @@ function seasonReportHTML(){const ms=selected(),a=teamAgg(ms),A=aggPlayers(ms).f
  const mr=ms.map(m=>({m,t:matchTeam(m)}));
  return `<h1>${esc(S.team.name)} – statistiky</h1><div>Sezóna ${esc(s.name)} · ${S.ui.comp==='all'?'všechny soutěže':esc(S.ui.comp)} · ${ms.length} ${plural(ms.length,'zápas','zápasy','zápasů')} · vytvořeno ${fD(today())}</div>
  <div class="kp"><div>Bilance<b>${a.V}–${a.R}–${a.P}</b></div><div>Skóre<b>${a.gf}:${a.ga}</b></div><div>Ø gólů<b>${f1(a.avgF)} : ${f1(a.avgA)}</b></div><div>Střelba<b>${fP(a.t.pct)}</b></div><div>Brankáři<b>${fP(a.t.svp)}</b></div><div>Bloky<b>${a.t.bl}</b></div></div>
- <h2>Hráči v poli</h2>${pdfTable(fc,fr,totRow(fr,ms.length))}<h2>Brankáři</h2>${pdfTable(gc,gr,totRow(gr,ms.length))}<h2>Zápasy</h2>${pdfTable(MCOLS,mr,totM(mr))}${TT.map(T=>{const tm2=ms.filter(m=>hasT(m.tm,T));return tm2.length?`<h2>${T.name}</h2>${tView(ppSum(tm2),T,1)}<div style="height:8px"></div>${pdfTable([...TBASE,...tCols(T)],tm2.map(m=>({m,tm:m.tm})),totPP(tm2.map(m=>({m,tm:m.tm}))))}<p style="color:#666;font-size:11px">${T.note}</p>`:''}).join('')}`}
+ <h2>Hráči v poli</h2>${pdfTable(fc,fr,totRow(fr,ms.length))}<h2>Brankáři</h2>${pdfTable(gc,gr,totRow(gr,ms.length))}<h2>Zápasy</h2>${pdfTable(MCOLS,mr,totM(mr))}${TT.map(T=>{const tm2=ms.filter(m=>hasT(m.tm,T));return tm2.length?`<h2>${T.name}</h2>${tView(ppSum(tm2),T,1)}<div style="height:8px"></div>${pdfTable([...TBASE,...tCols(T)],tm2.map(m=>({m,tm:m.tm})),totPP(tm2.map(m=>({m,tm:m.tm}))))}<p style="color:#666;font-size:11px">${T.note}</p>`:''}).join('')}${ms.some(hasTS)?['h','s'].map(sd=>`<h2>Pozice střel – ${OXN[sd]}</h2>${zoneTbl(tsMerge(ms.filter(hasTS))[sd],1)}`).join(''):''}`}
 function matchReportHTML(m){const L=S.team.players.filter(p=>played(m.stats[p.id])).map(p=>statLine(m.stats[p.id],p));const t=matchTeam(m);
  const fc=FCOLS.filter(c=>!['pos','z','gpz'].includes(c.k)),gc=GCOLS.filter(c=>!['z','svz'].includes(c.k));
  return `<h1>${esc(S.team.name)} ${m.home?'–':'@'} ${esc(m.opp||'?')} ${hasScore(m)?m.su+':'+m.so:''}</h1><div>${fD(m.date)} · ${m.home?'doma':'venku'} · ${esc(m.comp||'')}${m.ht?' · poločas '+esc(m.ht):''}</div>
  <div class="kp"><div>Střelba<b>${fP(t.pct)}</b></div><div>7m<b>${t.pg}/${t.pa}</b></div><div>Brankáři<b>${fP(t.svp)}</b></div><div>Zisky<b>${t.st}</b></div><div>Tech. chyby<b>${t.tf}</b></div><div>Bloky<b>${t.bl}</b></div></div>
- <h2>Hráči v poli</h2>${pdfTable(fc,L.filter(x=>x.p.pos!=='B').sort((a,b)=>b.goals-a.goals),totRow(L.filter(x=>x.p.pos!=='B'),1))}<h2>Brankáři</h2>${pdfTable(gc,L.filter(x=>x.p.pos==='B'),totRow(L.filter(x=>x.p.pos==='B'),1))}${TT.filter(T=>hasT(m.tm,T)).map(T=>`<h2>${T.name}</h2>${tView(m.tm,T,1)}`).join('')}${m.note?`<p>Poznámka: ${esc(m.note)}</p>`:''}`}
+ <h2>Hráči v poli</h2>${pdfTable(fc,L.filter(x=>x.p.pos!=='B').sort((a,b)=>b.goals-a.goals),totRow(L.filter(x=>x.p.pos!=='B'),1))}<h2>Brankáři</h2>${pdfTable(gc,L.filter(x=>x.p.pos==='B'),totRow(L.filter(x=>x.p.pos==='B'),1))}${TT.filter(T=>hasT(m.tm,T)).map(T=>`<h2>${T.name}</h2>${tView(m.tm,T,1)}`).join('')}${hasTS(m)?['h','s'].map(sd=>`<h2>Pozice střel – ${OXN[sd]}</h2>${zoneTbl(m.ts[sd]||[],1)}`).join(''):''}${m.note?`<p>Poznámka: ${esc(m.note)}</p>`:''}`}
 function statsCSV(){const ms=selected(),A=aggPlayers(ms).filter(t=>t.z>0);const tab=S.ui.stTab;let cols,rows;
  if(tab==='gk'){cols=GCOLS;rows=A.filter(t=>t.p.pos==='B')}else if(tab==='pp'){cols=PPCOLS;rows=ppRows(ms)}else if(tab==='zap'){cols=MCOLS;rows=ms.map(m=>({m,t:matchTeam(m)}))}else{cols=FCOLS;rows=A.filter(t=>t.p.pos!=='B')}
  const tot=tab==='pp'?totPP(rows):tab==='zap'?totM(rows):totRow(rows,ms.length);
@@ -994,8 +1018,9 @@ function demoData(){let sd=7;const rnd=()=>{sd|=0;sd=sd+0x6D2B79F5|0;let t=Math.
   shots.sort((a,b)=>a.min-b.min);
   fieldP.forEach(p=>{const x=st[p.id];if(!x||x.g==null)return;const miss=Math.max(0,(x.sh||0)-(x.g||0));const cats=FCAT.filter(([a])=>x[a]>0);const pool=cats.length?cats:[[p.pos==='K'?'zk':p.pos==='P'?'z6':'z9',p.pos==='K'?'sk':p.pos==='P'?'s6':'s9']];
    FCAT.forEach(([a,b])=>{if(x[a])x[b]=x[a]});for(let k=0;k<miss;k++){const[,b]=pool[Math.floor(rnd()*pool.length)];x[b]=(x[b]||0)+1}delete x.g;delete x.sh});
-  const tm={u6n:ri(3,8),u7n:rnd()<.4?ri(1,4):0,o6n:ri(3,8),o7n:rnd()<.3?ri(1,3):0};tm.u6g=ri(Math.floor(tm.u6n*.3),Math.ceil(tm.u6n*.75));tm.u7g=ri(0,tm.u7n);tm.o6g=ri(0,Math.ceil(tm.o6n*.35));tm.o7g=ri(0,tm.o7n);tm.su5n=ri(2,6);tm.su5g=ri(0,Math.ceil(tm.su5n*.6));tm.so5n=ri(3,8);tm.so5g=ri(Math.floor(tm.so5n*.4),tm.so5n);if(rnd()<.35){tm.so6n=ri(1,3);tm.so6g=ri(0,tm.so6n)}Object.keys(tm).forEach(k=>{if(!tm[k])delete tm[k]});
-  matches[id]={tm,id,seasonId:sid,comp:cup?'Pohár':'Liga',date:d,opp:opps[mi%opps.length]+(cup?'':''),home,su:T,so,ht:`${Math.round(T*.48)}:${Math.round(so*.5)}`,note:'',stats:st,shots,created:mi}});
+  const tm={u6n:ri(3,8),u7n:rnd()<.4?ri(1,4):0,o6n:ri(3,8),o7n:rnd()<.3?ri(1,3):0};tm.u6g=ri(Math.floor(tm.u6n*.3),Math.ceil(tm.u6n*.75));tm.u7g=ri(0,tm.u7n);tm.o6g=ri(0,Math.ceil(tm.o6n*.35));tm.o7g=ri(0,tm.o7n);tm.su5n=ri(2,6);tm.su5g=ri(0,Math.ceil(tm.su5n*.6));tm.so5n=ri(3,8);tm.so5g=ri(Math.floor(tm.so5n*.4),tm.so5n);if(rnd()<.35){tm.so6n=ri(1,3);tm.so6g=ri(0,tm.so6n)}[['rh',1],['rs',1]].forEach(([r])=>[['1',[2,6]],['2',[0,3]],['v',[0,3]],['b',[0,2]]].forEach(([c,[a,b2]])=>{const n=ri(a,b2);tm[r+c+'n']=n;tm[r+c+'g']=c==='b'?n:ri(Math.floor(n*.5),n)}));Object.keys(tm).forEach(k=>{if(!tm[k])delete tm[k]});
+  const ts={h:shots.filter(x=>!x.is7).map(x=>({x:x.x,y:x.y,r:x.r==='g'?'g':'m'})),s:[]};if(mi<8){const n=ri(34,46);let gl=Math.max(0,so-ri(2,5));for(let q=0;q<n;q++){const L=LOC[['K','S','S','P'][ri(0,3)]]();ts.s.push({x:L.x,y:L.y,r:q<gl?'g':'m'})}ts.s.sort(()=>rnd()-.5)}
+  matches[id]={ts,tm,id,seasonId:sid,comp:cup?'Pohár':'Liga',date:d,opp:opps[mi%opps.length]+(cup?'':''),home,su:T,so,ht:`${Math.round(T*.48)}:${Math.round(so*.5)}`,note:'',stats:st,shots,created:mi}});
  return{team,matches}}
 const pById2=(ps,id)=>ps.find(p=>p.id===id);
 
@@ -1017,6 +1042,8 @@ const ACT={
  async transfer(){const m=S.ed.m;if(!await ask('Přepsat u střelců góly a střely ve všech pozicích (7m, 6m, 9m, Kř, RÚ) podle naklikané střelby?','Přenést'))return;const T={};
   m.shots.forEach(s=>{const t=T[s.pid]||(T[s.pid]={pg:0,pa:0,z6:0,s6:0,z9:0,s9:0,zk:0,sk:0,ru:0,sr:0});if(s.is7){t.pa++;if(s.r==='g')t.pg++}else{const c=goalCat(s),sk={z6:'s6',z9:'s9',zk:'sk',ru:'sr'}[c];t[sk]++;if(s.r==='g')t[c]++}});
   Object.entries(T).forEach(([pid,t])=>{const st=m.stats[pid]||(m.stats[pid]={});delete st.g;delete st.sh;Object.keys(t).forEach(k=>{if(t[k])st[k]=t[k];else delete st[k]});st.p=1});touch();ACT.etab({dataset:{v:'quick'}});toast('Střelba přenesena do rychlého zápisu')},
+ oxm(b){const[side,v]=b.dataset.v.split('|');S.ui.oxm[side]=v;const y0=window.scrollY;ACT.etab({dataset:{v:'team'}});window.scrollTo(0,y0)},
+ oxUndo(b){const m=S.ed.m;if(m.ts&&m.ts[b.dataset.v])m.ts[b.dataset.v].pop();touch();const y0=window.scrollY;ACT.etab({dataset:{v:'team'}});window.scrollTo(0,y0)},
  stTab(b){S.ui.stTab=b.dataset.v;render()},
  selAll(){S.ui.excl.clear();render()},selNone(){inFilter().forEach(m=>S.ui.excl.add(m.id));render()},
  selHome(){S.ui.excl=new Set(inFilter().filter(m=>!m.home).map(m=>m.id));render()},selAway(){S.ui.excl=new Set(inFilter().filter(m=>m.home).map(m=>m.id));render()},
@@ -1044,6 +1071,7 @@ document.addEventListener('click',e=>{
   if(S.view==='zapas'&&S.ed){ACT.etab({dataset:{v:S.ui.etab}})}else render();return}
  const c=e.target.closest('[data-comp]');if(c){S.ui.comp=c.dataset.comp;S.ui.excl.clear();render();return}
  const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]&&!(a.tagName==='INPUT')){e.preventDefault();ACT[a.dataset.act](a);return}
+ if(S.view==='zapas'&&S.ed&&S.ui.etab==='team'){const sv=e.target.closest('svg[id^="ox-"]');if(sv){const side=sv.id.slice(3);const p=svgPt(sv,e);if(p.x<0||p.x>20||p.y<0||p.y>20)return;const m=S.ed.m;m.ts=m.ts||{h:[],s:[]};const a=m.ts[side]=m.ts[side]||[];const i=a.findIndex(q=>Math.hypot(q.x-p.x,q.y-p.y)<.6);if(i>=0)a.splice(i,1);else a.push({x:+p.x.toFixed(2),y:+p.y.toFixed(2),r:S.ui.oxm[side]||'g'});touch();const y0=window.scrollY;ACT.etab({dataset:{v:'team'}});window.scrollTo(0,y0);return}}
  const g=e.target.closest('tr[data-go]');if(g&&!e.target.closest('a,button,input')){location.hash=g.dataset.go;return}
  if(S.view==='zapas'&&S.ed&&S.ui.etab==='shots'){
   const dc=e.target.closest('#dc');if(dc){const p=svgPt(dc,e);if(p.x<0||p.x>20||p.y<0||p.y>20)return;const pe=S.ed.pend;pe.x=+p.x.toFixed(2);pe.y=+p.y.toFixed(2);pe.is7=false;const cb=$('[data-act="t7"]');if(cb)cb.checked=false;redrawShotUI();return}
@@ -1066,7 +1094,7 @@ let teamT;
 document.addEventListener('input',e=>{const t=e.target;
  if(t.classList.contains('qi')&&t.dataset.pid){const v=num(t.value);if(t.value!==''&&String(v)!==t.value)t.value=v||'';setStat(t.dataset.pid,t.dataset.k,v);return}
  if(t.dataset.pp){const m=S.ed.m;m.tm=m.tm||{};const v=num(t.value);if(t.value!==''&&String(v)!==t.value)t.value=v||'';if(v>0)m.tm[t.dataset.pp]=v;else delete m.tm[t.dataset.pp];
-  $$('[data-pp]').forEach(i=>{const r=i.dataset.pp.slice(0,-1);const g=+m.tm[r+'g']||0,n=+m.tm[r+'n']||0;i.classList.toggle('bad',g>n)});TT.forEach(T=>T.rows.forEach(([r])=>{const el=$('#ppr-'+r);if(el)el.textContent=fP(tRate(m.tm,T,r).p);T.cols.forEach(([c])=>{const e2=$('#ppc-'+r+c);if(e2)e2.textContent=fP(cRate(m.tm,T,r,c))})}));touch();return}
+  $$('[data-pp]').forEach(i=>{const r=i.dataset.pp.slice(0,-1);const g=+m.tm[r+'g']||0,n=+m.tm[r+'n']||0;i.classList.toggle('bad',g>n)});TT.forEach(T=>T.rows.forEach(([r])=>{const el=$('#ppr-'+r);if(el)el.textContent=fP(tRate(m.tm,T,r).p);const et=$('#ppt-'+r);if(et)et.textContent=totCell(m.tm,T,r);T.cols.forEach(([c])=>{const e2=$('#ppc-'+r+c);if(e2)e2.textContent=fP(cRate(m.tm,T,r,c))})}));touch();return}
  if(t.dataset.mf){const m=S.ed.m,k=t.dataset.mf;if(['home','comp','date'].includes(k))return;if(k==='su'||k==='so'){const v=t.value.replace(/\D/g,'');t.value=v;m[k]=v===''?null:+v;const c=$('#qchk');if(c)c.innerHTML=qCheck(m)}else m[k]=t.value;
   if(k==='opp')$('#mTitle').textContent=(m.home?'':'@ ')+(m.opp||'Nový zápas');touch();return}
  if(t.dataset.team){S.team[t.dataset.team]=t.value;clearTimeout(teamT);teamT=setTimeout(()=>{Store.saveTeam();updateHeader()},500);return}
