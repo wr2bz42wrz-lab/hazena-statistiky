@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HBC Jičín">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="favicon-64.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>HBC Jičín – statistiky</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,7 +42,7 @@ a{color:var(--blue)}
 .top{background:var(--band);color:var(--bandInk);padding-top:env(safe-area-inset-top)}
 .top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-top:14px;padding-bottom:12px}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto;text-decoration:none;color:inherit}
-.brand svg{width:34px;height:34px;flex:none}
+.brand img{width:40px;height:40px;flex:none;border-radius:9px;background:#fff;display:block}
 .brand b{font:700 24px/1 "Barlow Condensed",sans-serif;letter-spacing:.2px}
 .brand small{display:block;font-size:13px;opacity:.8;font-weight:500}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -343,7 +343,7 @@ svg.scv{width:100%;height:auto;display:block;touch-action:manipulation;user-sele
 <header class="top">
  <div class="wrap">
   <a class="brand" href="#prehled" aria-label="Přehled">
-   <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="#ff7a2e"/><path d="M4 16c8 2 14 8 16 22M36 16c-8 2-14 8-16 22M8 8c6 6 18 6 24 0" fill="none" stroke="#fff" stroke-width="2.4"/></svg>
+   <img src="logo-96.png" alt="" width="40" height="40">
    <span><b id="teamName">HBC Jičín</b><small id="teamSub">Statistiky týmu</small></span>
   </a>
   <div class="filters" id="filters" hidden>
